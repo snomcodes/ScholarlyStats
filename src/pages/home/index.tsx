@@ -1,6 +1,7 @@
 import { Helmet } from 'react-helmet'
 import { useTranslation } from 'react-i18next'
-import { Hero } from 'src/components/hero'
+// eslint-disable-next-line import/no-unresolved
+import { SearchBox } from 'src/components/hero'
 
 export default function Home() {
   const { t } = useTranslation('translation')
@@ -9,7 +10,7 @@ export default function Home() {
       <Helmet>
         <title>{t('title')}</title>
       </Helmet>
-      <Hero />
+      <SearchBox />
     </>
   )
 }
