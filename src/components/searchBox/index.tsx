@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
-import { useTranslation } from 'react-i18next'
 import InfiniteScroll from 'react-infinite-scroll-component'
 
+// TODO add more api results
+// TODO add categories
+// TODO add summary popover
+// TODO add direct PDF link
 interface ArxivResult {
   title: string
   author: string
@@ -10,7 +13,6 @@ interface ArxivResult {
 }
 
 export const SearchBox: React.FC = () => {
-  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ArxivResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -113,7 +115,12 @@ export const SearchBox: React.FC = () => {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('Enter search query')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                searchArxiv()
+              }
+            }}
+            placeholder={'Enter search query'}
             className="w-full flex-grow rounded-md border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
           />
           <button
@@ -121,7 +128,7 @@ export const SearchBox: React.FC = () => {
             onClick={searchArxiv}
             disabled={isLoading || query.trim() === ''}
           >
-            {t('Search')}
+            {'Search'}
           </button>
         </div>
       </div>
@@ -131,7 +138,7 @@ export const SearchBox: React.FC = () => {
           next={showRecent ? loadMoreRecentResults : loadMoreResults}
           hasMore={(showRecent ? hasMoreRecent : hasMore) && !isLoading}
           scrollableTarget="scrollableDiv"
-          loader={<h4 className="text-center text-white">{t('Loading...')}</h4>}
+          loader={<h4 className="text-center text-white">Loading...</h4>}
           className="container mx-auto px-4 py-4"
         >
           {(showRecent ? recentResults : results).map((result, index) => (
