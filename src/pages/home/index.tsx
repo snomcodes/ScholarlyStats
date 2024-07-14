@@ -1,14 +1,12 @@
 import { Helmet } from 'react-helmet'
-import { useTranslation } from 'react-i18next'
 // eslint-disable-next-line import/no-unresolved
 import { SearchBox } from 'src/components/searchBox/index'
 
 export default function Home() {
-  const { t } = useTranslation('translation')
   return (
     <>
       <Helmet>
-        <title>{t('title')}</title>
+        <title>ScholarlyStats</title>
       </Helmet>
       <SearchBox />
     </>

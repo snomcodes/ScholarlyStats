@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import axios from 'axios'
 import InfiniteScroll from 'react-infinite-scroll-component'
+//import { Button } from '../../components/ui/button'
 
 // TODO add more api results
 // TODO add categories
@@ -8,8 +9,12 @@ import InfiniteScroll from 'react-infinite-scroll-component'
 // TODO add direct PDF link
 interface ArxivResult {
   title: string
-  author: string
+  authors: string[]
+  summary: string
+  published: string
   link: string
+  query?: string
+  page?: number
 }
 
 export const SearchBox: React.FC = () => {
@@ -25,7 +30,8 @@ export const SearchBox: React.FC = () => {
   const [showRecent, setShowRecent] = useState(true)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
-  const fetchResults = useCallback(async (searchQuery: string, pageNumber: number) => {
+  const fetchResults = useCallback(async (searchQuery: string, pageNumber: number): Promise<ArxivResult[]> => {
+    setIsLoading(true)
     try {
       const response = await axios.get(
         `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(searchQuery)}&start=${
@@ -35,18 +41,36 @@ export const SearchBox: React.FC = () => {
       const parser = new DOMParser()
       const xml = parser.parseFromString(response.data, 'text/xml')
       const entries = xml.getElementsByTagName('entry')
-      return Array.from(entries).map((entry) => ({
-        title: entry.getElementsByTagName('title')[0]?.textContent ?? '',
-        link: entry.getElementsByTagName('id')[0]?.textContent ?? '',
-        author: entry.getElementsByTagName('author')[0]?.textContent ?? '',
-      }))
+      const papers: ArxivResult[] = Array.from(entries)
+        .map((entry) => {
+          const getTextContent = (tagName: string) => {
+            const element = entry.getElementsByTagName(tagName)[0]
+            return element?.textContent || ''
+          }
+          const authors = Array.from(entry.getElementsByTagName('author'))
+            .map((authorNode) => authorNode.textContent || 'Unknown Author')
+            .slice(0, 3)
+          return {
+            title: getTextContent('title'),
+            link: getTextContent('id'),
+            authors,
+            summary: getTextContent('summary'),
+            published: getTextContent('published'),
+          }
+        })
+        .filter((paper) => paper.title && paper.link)
+      setHasMore(papers.length === 10)
+      return papers
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error(error)
       return []
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
-  const fetchRecentPapers = useCallback(async (pageNumber: number) => {
+  const fetchRecentResults = useCallback(async (pageNumber: number): Promise<ArxivResult[]> => {
+    setIsLoading(true)
     try {
       const response = await axios.get(
         `https://export.arxiv.org/api/query?search_query=all&sortBy=submittedDate&sortOrder=descending&start=${
@@ -55,30 +79,44 @@ export const SearchBox: React.FC = () => {
       )
       const parser = new DOMParser()
       const xml = parser.parseFromString(response.data, 'text/xml')
-      if (xml.getElementsByTagName('parsererror').length > 0) {
-        throw new Error('Invalid XML')
-      }
       const entries = xml.getElementsByTagName('entry')
-      return Array.from(entries).map((entry) => ({
-        title: entry.getElementsByTagName('title')[0]?.textContent ?? '',
-        link: entry.getElementsByTagName('id')[0]?.textContent ?? '',
-        author: entry.getElementsByTagName('author')[0]?.textContent ?? '',
-      }))
+      const papers: ArxivResult[] = Array.from(entries)
+        .map((entry) => {
+          const getTextContent = (tagName: string) => {
+            const element = entry.getElementsByTagName(tagName)[0]
+            return element?.textContent || ''
+          }
+          const authors = Array.from(entry.getElementsByTagName('author'))
+            .map((authorNode) => authorNode.textContent || 'Unknown Author')
+            .slice(0, 3)
+          return {
+            title: getTextContent('title'),
+            link: getTextContent('id'),
+            authors,
+            summary: getTextContent('summary'),
+            published: getTextContent('published'),
+          }
+        })
+        .filter((paper) => paper.title && paper.link)
+      setHasMore(papers.length === 10)
+      return papers
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error(error)
       return []
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
   const loadMoreRecentResults = useCallback(async () => {
     if (isLoading || !hasMoreRecent) return
     setIsLoading(true)
-    const newResults = await fetchRecentPapers(recentPage)
+    const newResults = await fetchRecentResults(recentPage)
     setRecentResults((prevResults) => [...prevResults, ...newResults])
     setIsLoading(false)
     setHasMoreRecent(newResults.length === 10)
     setRecentPage((prevPage) => prevPage + 1)
-  }, [fetchRecentPapers, recentPage, isLoading, hasMoreRecent])
+  }, [fetchRecentResults, recentPage, isLoading, hasMoreRecent])
 
   const loadMoreResults = async () => {
     if (isLoading || !hasMore) return
@@ -108,8 +146,8 @@ export const SearchBox: React.FC = () => {
   }, [loadMoreRecentResults, initialLoadComplete])
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-950 p-2">
-      <div className="mb-4 mt-16 rounded-md bg-neutral-800 py-6 shadow-md">
+    <div className="flex h-screen flex-col bg-neutral-950 p-2 lg:w-screen lg:items-center lg:justify-center">
+      <div className="mb-2 mt-14 rounded-md bg-neutral-800 px-2 py-5 shadow-md lg:w-[50%]">
         <div className="container mx-auto flex flex-col items-center justify-center gap-2 sm:flex-row">
           <input
             type="text"
@@ -128,25 +166,28 @@ export const SearchBox: React.FC = () => {
             onClick={searchArxiv}
             disabled={isLoading || query.trim() === ''}
           >
-            {'Search'}
+            Search
           </button>
         </div>
       </div>
-      <div id="scrollableDiv" className="flex-grow overflow-y-auto rounded-md bg-neutral-800">
+      <div
+        id="scrollableDiv"
+        className="h-[calc(100vh-200px)] w-[calc(100vw-17px)] overflow-y-auto rounded-md bg-neutral-800 lg:w-[calc(100vw-300px)]"
+      >
         <InfiniteScroll
           dataLength={showRecent ? recentResults.length : results.length}
           next={showRecent ? loadMoreRecentResults : loadMoreResults}
           hasMore={(showRecent ? hasMoreRecent : hasMore) && !isLoading}
           scrollableTarget="scrollableDiv"
           loader={<h4 className="text-center text-white">Loading...</h4>}
-          className="container mx-auto px-4 py-4"
+          className="container mx-auto px-4 py-4 transition-all duration-300 ease-in-out"
         >
           {(showRecent ? recentResults : results).map((result, index) => (
             <div key={index} className="mb-4 rounded-md bg-neutral-900 p-4 shadow-md">
               <a href={result.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                 {result.title}
               </a>
-              <p className="mt-2 text-sm text-gray-400">{result.author}</p>
+              <p className="mt-2 text-sm text-gray-400">{result.authors}</p>
             </div>
           ))}
         </InfiniteScroll>
@@ -154,3 +195,5 @@ export const SearchBox: React.FC = () => {
     </div>
   )
 }
+
+export default SearchBox
