@@ -1,12 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import axios from 'axios'
 import InfiniteScroll from 'react-infinite-scroll-component'
-//import { Button } from '../../components/ui/button'
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 
 // TODO add more api results
 // TODO add categories
-// TODO add summary popover
-// TODO add direct PDF link
 interface ArxivResult {
   title: string
   authors: string[]
@@ -23,6 +21,7 @@ export const SearchBox: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
+  const [showCat, setShowCat] = useState(false)
 
   const [recentResults, setRecentResults] = useState<ArxivResult[]>([])
   const [recentPage, setRecentPage] = useState(0)
@@ -128,16 +127,19 @@ export const SearchBox: React.FC = () => {
     setPage((prevPage) => prevPage + 1)
   }
 
-  const searchArxiv = async () => {
-    setIsLoading(true)
-    setPage(1)
-    setResults([])
-    setHasMore(true)
-    setShowRecent(false)
-    const newResults = await fetchResults(query, 0)
-    setResults(newResults)
-    setIsLoading(false)
-  }
+  const searchArxiv = useCallback(
+    async (searchQuery: string) => {
+      setIsLoading(true)
+      setPage(1)
+      setResults([])
+      setHasMore(true)
+      setShowRecent(false)
+      const newResults = await fetchResults(searchQuery, 0)
+      setResults(newResults)
+      setIsLoading(false)
+    },
+    [fetchResults],
+  )
 
   useEffect(() => {
     if (!initialLoadComplete) {
@@ -145,52 +147,106 @@ export const SearchBox: React.FC = () => {
     }
   }, [loadMoreRecentResults, initialLoadComplete])
 
+  const handleCategoryClick = useCallback(
+    (category: string) => {
+      setQuery(category)
+      searchArxiv(category)
+      setShowCat(false)
+    },
+    [searchArxiv],
+  )
+
   return (
     <div className="flex h-screen flex-col bg-neutral-950 p-2 lg:w-screen lg:items-center lg:justify-center">
-      <div className="mb-2 mt-14 rounded-md bg-neutral-800 px-2 py-5 shadow-md lg:w-[50%]">
-        <div className="container mx-auto flex flex-col items-center justify-center gap-2 sm:flex-row">
+      <div className="relative mb-2 mt-[14%] rounded-md bg-neutral-800 px-2 py-3 shadow-md lg:mt-14 lg:h-auto lg:w-[1/3] lg:px-0 lg:py-2">
+        <div className="container mx-auto flex flex-col items-center justify-center gap-2 sm:flex-row lg:mx-auto lg:flex-col lg:gap-3 ">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                searchArxiv()
+                searchArxiv(query)
               }
             }}
             placeholder={'Enter search query'}
-            className="w-full flex-grow rounded-md border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
+            className="w-full flex-grow rounded-md border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto lg:w-[50%]"
           />
+          {/* Search button */}
           <button
-            className="w-full rounded-md bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 sm:w-auto"
-            onClick={searchArxiv}
+            className="w-full rounded-md bg-blue-800 px-4 py-2 font-bold text-white hover:bg-blue-700 sm:w-auto lg:w-[25%]"
+            onClick={() => searchArxiv(query)}
             disabled={isLoading || query.trim() === ''}
           >
             Search
           </button>
+          {/* Category Buttons */}
+          <div className="relative w-full sm:w-auto">
+            <button
+              className="flex w-full items-center justify-between rounded-md bg-neutral-900 p-2 text-center text-gray-300 sm:w-auto lg:mx-auto lg:w-[25%]"
+              onClick={() => setShowCat(!showCat)}
+            >
+              <span className="ml-5 flex-grow">Categories</span>
+              {showCat ? <ChevronUpIcon size={20} /> : <ChevronDownIcon size={20} />}
+            </button>
+            <div
+              className={`mt-1 overflow-hidden rounded-md bg-neutral-800 transition-all duration-300 ease-in-out ${
+                showCat ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="flex flex-wrap gap-3 p-3">
+                {[
+                  'Physics',
+                  'Mathematics',
+                  'Biology',
+                  'Computer Science',
+                  'Finance',
+                  'Statistics',
+                  'Electrical Engineering',
+                  'Economics',
+                ].map((category) => (
+                  <button
+                    key={category}
+                    className="rounded-full bg-neutral-900 px-3 py-1 text-sm text-white transition-colors duration-200 hover:bg-neutral-500"
+                    onClick={() => handleCategoryClick(category)}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div
-        id="scrollableDiv"
-        className="h-[calc(100vh-200px)] w-[calc(100vw-17px)] overflow-y-auto rounded-md bg-neutral-800 lg:w-[calc(100vw-300px)]"
+        className="relative flex-grow overflow-hidden rounded-md bg-neutral-800 lg:w-[calc(100vw-300px)]"
+        style={{ height: 'calc(100vh - 130px)', width: 'w-[calc(100vw-17px)]' }}
       >
-        <InfiniteScroll
-          dataLength={showRecent ? recentResults.length : results.length}
-          next={showRecent ? loadMoreRecentResults : loadMoreResults}
-          hasMore={(showRecent ? hasMoreRecent : hasMore) && !isLoading}
-          scrollableTarget="scrollableDiv"
-          loader={<h4 className="text-center text-white">Loading...</h4>}
-          className="container mx-auto px-4 py-4 transition-all duration-300 ease-in-out"
-        >
-          {(showRecent ? recentResults : results).map((result, index) => (
-            <div key={index} className="mb-4 rounded-md bg-neutral-900 p-4 shadow-md">
-              <a href={result.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                {result.title}
-              </a>
-              <p className="mt-2 text-sm text-gray-400">{result.authors}</p>
-            </div>
-          ))}
-        </InfiniteScroll>
+        {/* Inifinite Scroll */}
+        <div id="scrollableDiv" className="absolute inset-0 h-full w-full overflow-y-auto rounded-md bg-neutral-800">
+          <InfiniteScroll
+            dataLength={showRecent ? recentResults.length : results.length}
+            next={showRecent ? loadMoreRecentResults : loadMoreResults}
+            hasMore={(showRecent ? hasMoreRecent : hasMore) && !isLoading}
+            scrollableTarget="scrollableDiv"
+            loader={<h4 className="text-center text-white">Loading...</h4>}
+            className="container mx-auto h-full px-4 py-4 transition-all duration-300 ease-in-out"
+          >
+            {(showRecent ? recentResults : results).map((result, index) => (
+              <div key={index} className="mb-4 rounded-md bg-neutral-900 p-4 shadow-md lg:text-sm">
+                <a
+                  href={result.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  {result.title}
+                </a>
+                <p className="mt-2 text-sm text-gray-500 lg:text-xs">{result.authors}</p>
+              </div>
+            ))}
+          </InfiniteScroll>
+        </div>
       </div>
     </div>
   )
